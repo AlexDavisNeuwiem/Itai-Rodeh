@@ -1,67 +1,102 @@
+from multiprocessing import Queue
 from random import randint
 
 from lib.message import Message
 from lib.states import States
-from lib.constants import Constants
 
 
 class Itai_Rodeh_Process:
-    def __init__(self) -> None:
+    def __init__(self, number_of_ids: int, number_of_processes: int) -> None:
         """
-        ID is the process identity.
+        N é o número total de processos
 
-        STATE ranges over {active, passive, leader}.
+        K é o número total de IDs disponíveis
 
-        ROUND represents the number of the current election round.
+        ID é a identidade do processo (os IDs podem repetir)
+
+        STATE varia entre {ACTIVE, PASSIVE, LEADER}
+
+        ROUND representa o número do round de eleição atual
+
+        Cada processo possui sua MESSAGE QUEUE
+
+        Todo processo envia uma mensagem para o próximo do ciclo
         """
+        self.__number_of_ids = number_of_ids
+        self.__number_of_processes = number_of_processes
+
         self.__id = self.generate_id()
         self.__state = States.ACTIVE
         self.__round = 1
 
-        message = Message(self.__id, self.__round)
-        Constants.fair_scheduler.put(message)
+        self.message_queue = Queue()
 
     def generate_id(self) -> int:
-        return randint(1, Constants.number_of_ids)
+        """
+        o valor do ID é gerado aleatoriamente
+        """
+        return randint(1, self.__number_of_ids)
+    
+    def send_message(self, message: Message) -> None:
+        """
+        Inserindo a mensagem na MESSAGE QUEUE do processo
+        seguinte no ciclo
+        """
+        self.__next_process.message_queue.put(message)
 
-    def run(self) -> None:
-        message = Constants.fair_scheduler.get()
-        match self.__state:
-            case States.PASSIVE:
-                message.hop += 1
-                Constants.fair_scheduler.put(message)
-                return
-            case States.ACTIVE:
-                if (
-                    message.hop == Constants.number_of_processes
-                    and message.bit == True
-                ):
-                    self.__state = States.LEADER
-                elif (
-                    message.hop == Constants.number_of_processes
-                    and message.bit == False
-                ):
-                    self.__id = self.generate_id()
-                    self.__round += 1
-                    message = Message(self.__id, self.__round)
-                    Constants.fair_scheduler.put(message)
-                elif (
-                    (message.get_id(), message.get_round()) == (self.__id, self.__round) 
-                    and (message.hop < Constants.number_of_processes)
-                ):
+    def run(self, next_process) -> None:
+        """
+        Enviando a primeira mensagem para o processo adjacente
+        """
+        self.__next_process = next_process
+        message = Message(self.__id, self.__round)
+        self.send_message(message)
+
+        """
+        A execução só termina quando todo processo estiver no estado PASSIVE
+        ou ter sido eleito como líder e quando não restarem mais mensagens na
+        MESSAGE QUEUE
+
+        O comportamento dos processos está descrito no Tópico 2.1 do artigo
+        da pasta DATA
+        """
+        while(not self.message_queue.empty()):
+            message = self.message_queue.get()
+            match self.__state:
+                case States.PASSIVE:
                     message.hop += 1
-                    message.bit = False
-                    Constants.fair_scheduler.put(message)
-                elif (
-                    (message.get_id(), message.get_round()) > (self.__id, self.__round)
-                ):
-                    self.__state = States.PASSIVE
-                    message.hop += 1
-                    Constants.fair_scheduler.put(message)
-                elif (
-                    (message.get_id(), message.get_round()) < (self.__id, self.__round)
-                ):
+                    self.send_message(message)
+                case States.ACTIVE:
+                    if (
+                        message.hop == self.__number_of_processes
+                        and message.bit == True
+                    ):
+                        self.__state = States.LEADER
+                        print("Eu sou o Líder")
+                    elif (
+                        message.hop == self.__number_of_processes
+                        and message.bit == False
+                    ):
+                        self.__id = self.generate_id()
+                        self.__round += 1
+                        message = Message(self.__id, self.__round)
+                        self.send_message(message)
+                    elif (
+                        (message.get_id(), message.get_round()) == (self.__id, self.__round) 
+                        and (message.hop < self.__number_of_processes)
+                    ):
+                        message.hop += 1
+                        message.bit = False
+                        self.send_message(message)
+                    elif (
+                        (message.get_id(), message.get_round()) > (self.__id, self.__round)
+                    ):
+                        self.__state = States.PASSIVE
+                        message.hop += 1
+                        self.send_message(message)
+                    elif (
+                        (message.get_id(), message.get_round()) < (self.__id, self.__round)
+                    ):
+                        pass
+                case States.LEADER:
                     pass
-                return
-            case States.LEADER:
-                return

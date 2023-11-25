@@ -1,13 +1,15 @@
 class Message:
     def __init__(self, id: int, round: int) -> None:
         """
-        The values of ID and ROUND are taken from the process that sends the message.
+        Os valores de ID e ROUND são obtidos do processo que originou
+        a mensagem
 
-        HOP is a counter that initially has the value one, and which is increased by
-        one every time it is passed on by a process.
+        HOP é um contador inicializado em 1 e é incrementado toda vez
+        que um processo repassa a mensagem
 
-        BIT is a bit that initially is true, and which is set to false when it visits
-        a process that has the same identity but that is not its originator.
+        BIT é um booleano inicializado como true e que recebe o valor
+        false quando a mensagem visita um processo com o mesmo ID que
+        seu emissor
         """
         self.__id = id
         self.__round = round
