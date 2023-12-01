@@ -60,19 +60,32 @@ class Itai_Rodeh_Process:
         O comportamento dos processos está descrito no Tópico 2.1 do artigo
         da pasta DATA
         """
-        while(not self.message_queue.empty()):
-            message = self.message_queue.get()
+        while(True):
+            if not self.message_queue.empty():
+                message = self.message_queue.get()
+                print(f"O processo {self.__id} recebeu a mensagem ({message.get_id()}, {message.get_round()}, {message.hop}, {message.bit})", flush=True)
+            else:
+                continue
+
             match self.__state:
                 case States.PASSIVE:
                     message.hop += 1
                     self.send_message(message)
+                    if message.get_round() == -1:
+                        return
                 case States.ACTIVE:
+                    if message.get_round() == -1:
+                        print("ERROR", flush=True)
+                        return
                     if (
                         message.hop == self.__number_of_processes
                         and message.bit == True
                     ):
                         self.__state = States.LEADER
-                        print("Eu sou o Líder")
+                        print("Eu sou o Líder", flush=True)
+                        message = Message(self.__id, -1)
+                        self.send_message(message)
+                        return
                     elif (
                         message.hop == self.__number_of_processes
                         and message.bit == False
@@ -98,5 +111,3 @@ class Itai_Rodeh_Process:
                         (message.get_id(), message.get_round()) < (self.__id, self.__round)
                     ):
                         pass
-                case States.LEADER:
-                    pass

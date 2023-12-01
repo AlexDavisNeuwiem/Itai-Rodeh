@@ -3,22 +3,26 @@ from multiprocessing import Process
 from lib.itai_rodeh_process import Itai_Rodeh_Process
 
 
-def process_ring_initializer() -> None:
-    # Obtendo o valor de N e K
-    number_of_processes = int(input("N = "))
-    number_of_ids = int(input("K = "))
+class Process_Ring:
+    def __init__(self, number_of_ids: int, number_of_processes: int) -> None:
+        # Inicializando o ciclo de processos de Itai-Rodeh
+        self.__process_ring = []
+        for i in range(number_of_processes):
+            itai_rodeh_process = Itai_Rodeh_Process(number_of_ids, number_of_processes)
+            self.__process_ring.append(itai_rodeh_process)
 
-    # Inicializando o ciclo de processos de Itai-Rodeh
-    process_ring = [Itai_Rodeh_Process(number_of_ids, number_of_processes) for _ in range(number_of_processes)]
+        # Gerando a lista de processos do sistema
+        self.__python_process_list = []
+        for i in range(number_of_processes):
+            next_ring_index = (i + 1) % number_of_processes
+            python_process = Process(target=self.__process_ring[i].run, args=(self.__process_ring[next_ring_index],))
+            self.__python_process_list.append(python_process)
 
-    # Gerando a lista de processos do sistema
-    python_process_list = []
-    for i in range(number_of_processes):
-        next_ring_index = (i + 1) % number_of_processes
-        python_process = Process(target=process_ring[i].run, args=(process_ring[next_ring_index],))
-        python_process_list.append(python_process)
+    def run(self):
+        # Iniciando a execução de cada processo
+        for python_process in self.__python_process_list:
+            python_process.start()
 
-    # Iniciando a execução de cada processo
-    for python_process in python_process_list:
-        python_process.start()
-        python_process.join()
+        # Realizando o join dos processos
+        for python_process in self.__python_process_list:
+            python_process.join()
