@@ -37,6 +37,13 @@ class Itai_Rodeh_Process:
         """
         return randint(1, self.__number_of_ids)
     
+    def receive_message(self) -> Message:
+        while True:
+            if not self.message_queue.empty():
+                message = self.message_queue.get()
+                print(f"O processo {self.__id} recebeu a mensagem ({message.get_id()}, {message.get_round()}, {message.hop}, {message.bit})", flush=True)
+                return message
+    
     def send_message(self, message: Message) -> None:
         """
         Inserindo a mensagem na MESSAGE QUEUE do processo
@@ -60,13 +67,8 @@ class Itai_Rodeh_Process:
         O comportamento dos processos está descrito no Tópico 2.1 do artigo
         da pasta DATA
         """
-        while(True):
-            if not self.message_queue.empty():
-                message = self.message_queue.get()
-                print(f"O processo {self.__id} recebeu a mensagem ({message.get_id()}, {message.get_round()}, {message.hop}, {message.bit})", flush=True)
-            else:
-                continue
-
+        while True:
+            message = self.receive_message()
             match self.__state:
                 case States.PASSIVE:
                     message.hop += 1
