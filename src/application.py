@@ -1,7 +1,7 @@
 from lib.process_ring import Process_Ring
 
 
-def teste():
+def application():
     process_ring = Process_Ring(3, 5, worker_function, leader_function)
     process_ring.run()
 

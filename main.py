@@ -5,7 +5,7 @@ Autores:
     - Lucas Castro Truppel Machado (22100632)
 """
 
-from src.teste import teste
+from src.application import application
 
 if __name__ == "__main__":
-    teste()
+    application()

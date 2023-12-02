@@ -38,6 +38,10 @@ class Itai_Rodeh_Process:
         return randint(1, self.__number_of_ids)
     
     def receive_message(self) -> Message:
+        """
+        Recebendo a mensagem enviada pelo processo na
+        posição anterior no ciclo
+        """
         while True:
             if not self.message_queue.empty():
                 message = self.message_queue.get()
