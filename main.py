@@ -5,8 +5,7 @@ Autores:
     - Lucas Castro Truppel Machado (22100632)
 """
 
-from lib.process_ring import Process_Ring
+from src.teste import teste
 
 if __name__ == "__main__":
-    pr = Process_Ring(3, 5)
-    pr.run()
+    teste()

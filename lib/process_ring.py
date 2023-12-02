@@ -4,7 +4,7 @@ from lib.itai_rodeh_process import Itai_Rodeh_Process
 
 
 class Process_Ring:
-    def __init__(self, number_of_ids: int, number_of_processes: int) -> None:
+    def __init__(self, number_of_ids: int, number_of_processes: int, worker_function, leader_function) -> None:
         # Inicializando o ciclo de processos de Itai-Rodeh
         self.__process_ring = []
         for i in range(number_of_processes):
@@ -15,7 +15,7 @@ class Process_Ring:
         self.__python_process_list = []
         for i in range(number_of_processes):
             next_ring_index = (i + 1) % number_of_processes
-            python_process = Process(target=self.__process_ring[i].run, args=(self.__process_ring[next_ring_index],))
+            python_process = Process(target=self.__process_ring[i].run, args=(self.__process_ring[next_ring_index], worker_function, leader_function))
             self.__python_process_list.append(python_process)
 
     def run(self):

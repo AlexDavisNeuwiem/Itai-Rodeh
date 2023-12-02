@@ -44,7 +44,7 @@ class Itai_Rodeh_Process:
         """
         self.__next_process.message_queue.put(message)
 
-    def run(self, next_process) -> None:
+    def run(self, next_process, worker_function, leader_function) -> None:
         """
         Enviando a primeira mensagem para o processo adjacente
         """
@@ -73,14 +73,13 @@ class Itai_Rodeh_Process:
                     self.send_message(message)
                     if message.get_round() == -1:
                         if self.message_queue.empty():
+                            worker_function()
                             return
                         else:
-                            print("ERROR: Message Queue not empty!", flush=True)
-                            return
+                            raise Exception("A fila de mensagens não está vazia!")
                 case States.ACTIVE:
                     if message.get_round() == -1:
-                        print("ERROR: Active process found", flush=True)
-                        return
+                        raise Exception("O processo não deveria ser ACTIVE no final da execução!")
                     if (
                         message.hop == self.__number_of_processes
                         and message.bit == True
@@ -116,7 +115,7 @@ class Itai_Rodeh_Process:
                         pass
                 case States.LEADER:
                     if self.message_queue.empty():
+                        leader_function()
                         return
                     else:
-                        print("ERROR: Message Queue not empty!", flush=True)
-                        return
+                        raise Exception("A fila de mensagens não está vazia!")
