@@ -1,4 +1,5 @@
 from multiprocessing import Queue
+from os import getpid
 from random import randint
 
 from lib.message import Message
@@ -45,7 +46,7 @@ class Itai_Rodeh_Process:
         while True:
             if not self.message_queue.empty():
                 message = self.message_queue.get()
-                print(f"O processo {self.__id} recebeu a mensagem ({message.get_id()}, {message.get_round()}, {message.hop}, {message.bit})", flush=True)
+                print(f"LIB: O processo {getpid()} recebeu a mensagem ({message.get_id()}, {message.get_round()}, {message.hop}, {message.bit})", flush=True)
                 return message
     
     def send_message(self, message: Message) -> None:
@@ -91,7 +92,7 @@ class Itai_Rodeh_Process:
                         and message.bit == True
                     ):
                         self.__state = States.LEADER
-                        print("Eu sou o Líder", flush=True)
+                        print(f"LIB: O processo {getpid()} foi eleito como líder!", flush=True)
                         message = Message(self.__id, -1)
                         self.send_message(message)
                     elif (
