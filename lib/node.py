@@ -2,57 +2,81 @@ import socket
 import random
 import threading
 from ast import literal_eval
+from os import getpid
 from time import sleep
+
+from message import Message
+from message_queue import MessageQueue
+from states import States
 
 ip = "127.0.0.1"
 port = random.randint(1024, 65535)
 
 init_node_ip = "127.0.0.1"
-init_node_port = 12347
+init_node_port = 12349
 
-     
+
 class Node:
-    
+
     def __init__(self, ip, port, init_node_ip, init_node_port):
         self.ip = ip
         self.port = port
         self.init_node_ip = init_node_ip
         self.init_node_port = init_node_port
-        
+
         self.own_socket = None
         self.next_ip = None
         self.next_port = None
         self.next_socket = None
-        
+
+        self.__number_of_ids = None
+        self.__number_of_processes = None
+        self.__processes_addresses = None
+        self.__id = None
+        self.__state = States.ACTIVE
+        self.__round = 1
+        self.message_queue = MessageQueue()
+
     def run(self):
+        print("[BEGIN INITILIZATION]", flush=True)
         self.join_group()
         thread = threading.Thread(target=self.create_own_socket)
         thread.start()
         self.connect_to_next_socket()
-        self.send_message(f"Hello, I am node {self.ip}:{self.port}")
         thread.join()
+        print("[END INITILIZATION]", flush=True)
+
+        print("\n[BEGIN ELECTION]", flush=True)
+        self.run_election()
+        print("[END ELECTION]", flush=True)
+
         self.close_own_socket()
         self.close_socket_to_next()
-        
-        
+
     def join_group(self):
-        s = socket.socket()         
+        s = socket.socket()
         s.connect((self.init_node_ip, self.init_node_port))
-        s.send(str((self.ip, self.port)).encode()) 
-        print (s.recv(1024).decode())
-        self.next_ip, self.next_port = literal_eval(s.recv(1024).decode())
-        print (f"The node in front of my is {self.next_ip}:{self.next_port}")
+        print("Connected to init node. Waiting to be allocated in ring...")
+        s.send(str((self.ip, self.port)).encode())
+
+        msg = s.recv(1024).decode()
+        self.__number_of_processes, self.__number_of_ids = literal_eval(msg)
+
+        msg = s.recv(1024).decode()
+        processes_str_addresses, next_index = literal_eval(msg)
+        self.__processes_addresses = list(map(lambda t: literal_eval(t), processes_str_addresses))
+        self.next_ip, self.next_port = self.__processes_addresses[next_index]
+        print(f"Connected to ring. The node in front of my is {self.next_ip}:{self.next_port}")
         s.close()
-        
+
     def create_own_socket(self):
-        s = socket.socket()         
-        s.bind((self.ip, self.port))         
+        s = socket.socket()
+        s.bind((self.ip, self.port))
         s.listen(1)
         print("waiting for connection...")
-        self.own_socket, addr =  s.accept()
+        self.own_socket, addr = s.accept()
         print("Received connection on own socket")
-        print("Received message:", self.receive_message())
-        
+
     def connect_to_next_socket(self):
         self.next_socket = socket.socket()
         while True:
@@ -63,20 +87,120 @@ class Node:
                 break
             except:
                 sleep(0.1)
-                
+
     def close_socket_to_next(self):
         self.next_socket.close()
-        
+
     def close_own_socket(self):
         self.own_socket.close()
-        
-    def send_message(self, message):
+
+    def write(self, message):
         self.next_socket.send(message.encode())
-        
-    def receive_message(self):
+
+    def read(self):
         return self.own_socket.recv(1024).decode()
-        
+
+    def send_message(self, message_object: Message):
+        message = str(Message.to_tuple(message_object))
+        self.next_socket.send(message.encode())
+        print(f"Sent message: {message}", flush=True)
+
+    def receive_message(self):
+        if not self.message_queue.empty():
+            return self.message_queue.get_new_message()
+        message_str = self.own_socket.recv(1024).decode()
+        print(f"Received message: {message_str}", flush=True)
+        for mes in message_str.split(")("):
+            mes = mes.replace("(", "").replace(")", "")
+            self.message_queue.add_message(Message.from_tuple(literal_eval(mes)))
+        return self.message_queue.get_new_message()
+
+    def generate_id(self) -> int:
+        """
+        o valor do ID é gerado aleatoriamente
+        """
+        return random.randint(1, self.__number_of_ids)
+
+    def run_election(self) -> None:
+        """
+        Enviando a primeira mensagem para o processo adjacente
+        """
+        self.__id = self.generate_id()
+        message = Message(self.__id, self.__round)
+        self.send_message(message)
+
+        """
+        A execução só termina quando todo processo estiver no estado PASSIVE
+        ou ter sido eleito como líder e quando não restarem mais mensagens na
+        MESSAGE QUEUE
+
+        O comportamento dos processos está descrito no Tópico 2.1 do artigo
+        da pasta DATA
+        """
+        while True:
+            message = self.receive_message()
+            match self.__state:
+                case States.PASSIVE:
+                    message.hop += 1
+                    self.send_message(message)
+                    if message.get_round() == -1:
+                        self.__round = -1
+                        if self.message_queue.empty():
+                            worker_function()
+                            return
+                        else:
+                            raise Exception(f"The Message Queue of {getpid()} is not empty after the leader election!")
+                case States.ACTIVE:
+                    if message.get_round() == -1:
+                        raise Exception(f"The process {getpid()} should not be ACTIVE after the leader election!")
+                    if (
+                        message.hop == self.__number_of_processes
+                        and message.bit == True
+                    ):
+                        self.__state = States.LEADER
+                        message = Message(self.__id, -1)
+                        self.send_message(message)
+                    elif (
+                        message.hop == self.__number_of_processes
+                        and message.bit == False
+                    ):
+                        self.__id = self.generate_id()
+                        self.__round += 1
+                        message = Message(self.__id, self.__round)
+                        self.send_message(message)
+                    elif (
+                        (message.get_id(), message.get_round()) == (self.__id, self.__round)
+                        and (message.hop < self.__number_of_processes)
+                    ):
+                        message.hop += 1
+                        message.bit = False
+                        self.send_message(message)
+                    elif (
+                        (message.get_id(), message.get_round()) > (self.__id, self.__round)
+                    ):
+                        self.__state = States.PASSIVE
+                        message.hop += 1
+                        self.send_message(message)
+                    elif (
+                        (message.get_id(), message.get_round()) < (self.__id, self.__round)
+                    ):
+                        pass
+                case States.LEADER:
+                    if self.message_queue.empty():
+                        self.__round = -1
+                        leader_function()
+                        return
+                    else:
+                        raise Exception(f"The Message Queue of {getpid()} is not empty after the leader election!")
+
 
 if __name__ == "__main__":
+    def worker_function():
+        print(f"SRC: {getpid()} is not the leader.", flush=True)
+        return
+
+    def leader_function():
+        print(f"SRC: The leader is {getpid()}!", flush=True)
+        return
+
     Node(ip, port, init_node_ip, init_node_port).run()
-    
