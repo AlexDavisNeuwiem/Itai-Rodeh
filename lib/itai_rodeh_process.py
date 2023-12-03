@@ -2,6 +2,7 @@ from multiprocessing import Queue
 from os import getpid
 from random import randint
 
+import lib.node as node_ring
 from lib.message import Message
 from lib.states import States
 
@@ -46,7 +47,7 @@ class Itai_Rodeh_Process:
         while True:
             if not self.message_queue.empty():
                 message = self.message_queue.get()
-                print(f"LIB: O processo {getpid()} recebeu a mensagem ({message.get_id()}, {message.get_round()}, {message.hop}, {message.bit})", flush=True)
+                print(f"LIB: {getpid()} received the message ({message.get_id()}, {message.get_round()}, {message.hop}, {message.bit})", flush=True)
                 return message
     
     def send_message(self, message: Message) -> None:
@@ -83,16 +84,15 @@ class Itai_Rodeh_Process:
                             worker_function()
                             return
                         else:
-                            raise Exception("A fila de mensagens não está vazia!")
+                            raise Exception(f"The Message Queue of {getpid()} is not empty after the leader election!")
                 case States.ACTIVE:
                     if message.get_round() == -1:
-                        raise Exception("O processo não deveria ser ACTIVE no final da execução!")
+                        raise Exception(f"The process {getpid()} should not be ACTIVE after the leader election!")
                     if (
                         message.hop == self.__number_of_processes
                         and message.bit == True
                     ):
                         self.__state = States.LEADER
-                        print(f"LIB: O processo {getpid()} foi eleito como líder!", flush=True)
                         message = Message(self.__id, -1)
                         self.send_message(message)
                     elif (
@@ -125,4 +125,4 @@ class Itai_Rodeh_Process:
                         leader_function()
                         return
                     else:
-                        raise Exception("A fila de mensagens não está vazia!")
+                        raise Exception(f"The Message Queue of {getpid()} is not empty after the leader election!")
