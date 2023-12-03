@@ -1,7 +1,7 @@
 import socket     
 
 ip = "127.0.0.1"
-port = 12349
+port = 12345
 clients_amount = 3
 N = 3
 K = 2

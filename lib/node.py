@@ -24,7 +24,8 @@ class Node:
         self.init_node_ip = init_node_ip
         self.init_node_port = init_node_port
 
-        self.own_socket = None
+        self.conn_socket = None
+        self.previous_socket = None
         self.next_ip = None
         self.next_port = None
         self.next_socket = None
@@ -39,19 +40,22 @@ class Node:
 
     def run(self):
         print("[BEGIN INITILIZATION]", flush=True)
+        self.create_con_socket()
         self.join_group()
-        thread = threading.Thread(target=self.create_own_socket)
+        thread = threading.Thread(target=self.create_previous_socket)
         thread.start()
         self.connect_to_next_socket()
         thread.join()
         print("[END INITILIZATION]", flush=True)
 
         print("\n[BEGIN ELECTION]", flush=True)
-        self.run_election()
+        is_leader, addresses = self.run_election()
         print("[END ELECTION]", flush=True)
 
-        self.close_own_socket()
+        # self.close_own_socket()
         self.close_socket_to_next()
+
+        return is_leader, addresses, self.conn_socket
 
     def join_group(self):
         s = socket.socket()
@@ -69,13 +73,15 @@ class Node:
         print(f"Connected to ring. The node in front of my is {self.next_ip}:{self.next_port}")
         s.close()
 
-    def create_own_socket(self):
-        s = socket.socket()
-        s.bind((self.ip, self.port))
-        s.listen(1)
+    def create_con_socket(self):
+        self.conn_socket = socket.socket()
+        self.conn_socket.bind((self.ip, self.port))
+        self.conn_socket.listen(1)
+
+    def create_previous_socket(self):
         print("waiting for connection...")
-        self.own_socket, addr = s.accept()
-        print("Received connection on own socket")
+        self.previous_socket, addr = self.conn_socket.accept()
+        print("Received connection on previous socket")
 
     def connect_to_next_socket(self):
         self.next_socket = socket.socket()
@@ -92,13 +98,13 @@ class Node:
         self.next_socket.close()
 
     def close_own_socket(self):
-        self.own_socket.close()
+        self.previous_socket.close()
 
     def write(self, message):
         self.next_socket.send(message.encode())
 
     def read(self):
-        return self.own_socket.recv(1024).decode()
+        return self.previous_socket.recv(1024).decode()
 
     def send_message(self, message_object: Message):
         message = str(Message.to_tuple(message_object))
@@ -108,7 +114,7 @@ class Node:
     def receive_message(self):
         if not self.message_queue.empty():
             return self.message_queue.get_new_message()
-        message_str = self.own_socket.recv(1024).decode()
+        message_str = self.previous_socket.recv(1024).decode()
         print(f"Received message: {message_str}", flush=True)
         for mes in message_str.split(")("):
             mes = mes.replace("(", "").replace(")", "")
@@ -121,7 +127,7 @@ class Node:
         """
         return random.randint(1, self.__number_of_ids)
 
-    def run_election(self) -> None:
+    def run_election(self) -> tuple[bool, list[tuple[str, int]]]:
         """
         Enviando a primeira mensagem para o processo adjacente
         """
@@ -146,8 +152,8 @@ class Node:
                     if message.get_round() == -1:
                         self.__round = -1
                         if self.message_queue.empty():
-                            worker_function()
-                            return
+                            print(f"SRC: {getpid()} is not the leader.", flush=True)
+                            return False, self.__processes_addresses
                         else:
                             raise Exception(f"The Message Queue of {getpid()} is not empty after the leader election!")
                 case States.ACTIVE:
@@ -188,19 +194,11 @@ class Node:
                 case States.LEADER:
                     if self.message_queue.empty():
                         self.__round = -1
-                        leader_function()
-                        return
+                        print(f"SRC: The leader is {getpid()}!", flush=True)
+                        return True, self.__processes_addresses
                     else:
                         raise Exception(f"The Message Queue of {getpid()} is not empty after the leader election!")
 
 
 if __name__ == "__main__":
-    def worker_function():
-        print(f"SRC: {getpid()} is not the leader.", flush=True)
-        return
-
-    def leader_function():
-        print(f"SRC: The leader is {getpid()}!", flush=True)
-        return
-
     Node(ip, port, init_node_ip, init_node_port).run()
