@@ -9,6 +9,11 @@ Link para acessar os slides de apresentação
 ```
 https://docs.google.com/presentation/d/1ys7eDjahN35woBHKmbIW_DDbgMvv8PEI7KpHp9fT9iw/edit?usp=sharing
 ```
+Link para acessar o vídeo de apresentação
+```
+https://youtu.be/OrdNBnl70BA
+```
+
 
 ## Execução
 
